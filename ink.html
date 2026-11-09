@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>體驗二｜吹墨</title>
+<style>
+  :root { --paper:#f2ebdd; --ink:#1d1b19; --muted:#8a8174; }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; overflow:hidden; background:var(--paper); overscroll-behavior:none;
+    font-family:"Noto Serif TC","Songti TC","PMingLiU",serif; color:var(--ink); touch-action:none;
+    -webkit-user-select:none; user-select:none; }
+  canvas { position:fixed; inset:0; width:100%; height:100%; }
+  #ink { mix-blend-mode:multiply; }
+  #ui { position:fixed; left:0; right:0; bottom:0; padding:10px 14px calc(12px + env(safe-area-inset-bottom));
+    display:flex; gap:8px; align-items:center; justify-content:center;
+    background:linear-gradient(transparent, rgba(242,235,221,.92) 40%); }
+  #ui button { border:1px solid rgba(29,27,25,.35); background:rgba(255,255,255,.35); color:var(--ink);
+    border-radius:999px; padding:9px 14px; font-family:inherit; font-size:14px; }
+  .sw { width:34px; height:34px; border-radius:50%; border:2px solid transparent; padding:0 !important; }
+  .sw.on { border-color:var(--ink); outline:2px solid var(--paper); outline-offset:-4px; }
+  #meter { position:fixed; top:calc(12px + env(safe-area-inset-top)); left:14px; display:flex; align-items:center; gap:8px;
+    font-size:12px; color:var(--muted); }
+  #meter i { display:block; width:70px; height:4px; background:rgba(0,0,0,.08); border-radius:2px; overflow:hidden; }
+  #meter b { display:block; height:100%; width:0; background:var(--ink); transition:width .05s; }
+  .back { position:fixed; top:calc(10px + env(safe-area-inset-top)); right:14px; color:var(--muted); font-size:13px; text-decoration:none; z-index:2; }
+  #intro, #shot { position:fixed; inset:0; z-index:5; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background:var(--paper); text-align:center; padding:30px; }
+  #intro small { letter-spacing:.25em; color:var(--muted); font-size:12px; }
+  #intro h1 { font-size:42px; font-weight:600; margin:6px 0 22px; letter-spacing:.2em; }
+  #intro ul { list-style:none; font-size:16px; line-height:2.1; margin-bottom:28px; }
+  #intro .go { background:var(--ink); color:var(--paper); border:none; border-radius:999px; padding:15px 34px; font-family:inherit; font-size:17px; letter-spacing:.1em; }
+  #intro p { margin-top:16px; font-size:12px; color:var(--muted); line-height:1.6; }
+  #shot { display:none; background:rgba(29,27,25,.88); color:#f2ebdd; }
+  #shot img { max-width:90%; max-height:70%; box-shadow:0 10px 40px rgba(0,0,0,.5); }
+  #shot p { margin:16px 0; font-size:15px; }
+  #shot button { background:#f2ebdd; color:var(--ink); border:none; border-radius:999px; padding:10px 26px; font-family:inherit; font-size:15px; }
+  #toast { position:fixed; top:40%; left:50%; transform:translate(-50%,-50%); background:rgba(29,27,25,.8); color:#f2ebdd;
+    padding:10px 18px; border-radius:10px; font-size:14px; opacity:0; transition:opacity .4s; pointer-events:none; z-index:4; }
+</style>
+</head>
+<body>
+<canvas id="paper"></canvas>
+<canvas id="ink"></canvas>
+
+<div id="meter"><span>氣息</span><i><b id="lvl"></b></i></div>
+<a class="back" href="index.html">← 目錄</a>
+
+<div id="ui">
+  <button class="sw on" data-c="20,18,16" style="background:#1d1b19" aria-label="墨"></button>
+  <button class="sw" data-c="178,52,32" style="background:#b23420" aria-label="朱"></button>
+  <button class="sw" data-c="34,72,118" style="background:#224876" aria-label="花青"></button>
+  <button class="sw" data-c="176,132,40" style="background:#b08428" aria-label="藤黃"></button>
+  <button id="clear">清除</button>
+  <button id="save">存圖</button>
+</div>
+
+<div id="intro">
+  <small>體驗二 · 互動</small>
+  <h1>吹墨</h1>
+  <ul>
+    <li>👆 點一下紙面，滴下墨</li>
+    <li>💨 對著手機<b>下方</b>吹氣，把墨吹開</li>
+    <li>📱 傾斜手機，讓墨流動</li>
+  </ul>
+  <button class="go" id="go">鋪紙・研墨</button>
+  <p>需要允許「麥克風」與「動作感應」<br>聲音只在你的手機裡即時運算，不會錄音或上傳</p>
+</div>
+
+<div id="shot">
+  <img id="shotImg" alt="你的作品">
+  <p>長按圖片即可儲存</p>
+  <button id="shotClose">繼續創作</button>
+</div>
+<div id="toast"></div>
+
+<script>
+(() => {
+const paperC = document.getElementById('paper'), inkC = document.getElementById('ink');
+const pctx = paperC.getContext('2d'), ctx = inkC.getContext('2d');
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+let W, H;
+
+function toast(msg, ms = 2200) {
+  const t = document.getElementById('toast'); t.textContent = msg; t.style.opacity = 1;
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.style.opacity = 0, ms);
+}
+
+// ---------- rice paper ----------
+function drawPaper() {
+  pctx.fillStyle = '#f2ebdd'; pctx.fillRect(0, 0, W, H);
+  const img = pctx.getImageData(0, 0, W, H), d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const n = (Math.random() - .5) * 10;
+    d[i] += n; d[i+1] += n; d[i+2] += n * .9;
+  }
+  pctx.putImageData(img, 0, 0);
+  pctx.lineCap = 'round';
+  for (let i = 0; i < (W * H) / 900; i++) {           // fibers
+    const x = Math.random() * W, y = Math.random() * H, a = Math.random() * Math.PI, l = (4 + Math.random() * 18) * DPR;
+    pctx.strokeStyle = `rgba(150,130,100,${.04 + Math.random() * .07})`;
+    pctx.lineWidth = (.4 + Math.random() * .8) * DPR;
+    pctx.beginPath(); pctx.moveTo(x, y);
+    pctx.quadraticCurveTo(x + Math.cos(a + .5) * l * .5, y + Math.sin(a + .5) * l * .5, x + Math.cos(a) * l, y + Math.sin(a) * l);
+    pctx.stroke();
+  }
+}
+
+function resize() {
+  const keep = W ? (() => { const c = document.createElement('canvas'); c.width = W; c.height = H; c.getContext('2d').drawImage(inkC, 0, 0); return c; })() : null;
+  W = Math.floor(innerWidth * DPR); H = Math.floor(innerHeight * DPR);
+  paperC.width = inkC.width = W; paperC.height = inkC.height = H;
+  drawPaper();
+  ctx.globalCompositeOperation = 'darken';   // resetting canvas size resets this
+  if (keep) ctx.drawImage(keep, 0, 0, W, H);
+}
+addEventListener('resize', resize); resize();
+
+// ---------- ink particles ----------
+let color = '20,18,16';
+const P = [], MAX = 1400;
+
+// opaque ink diluted toward paper as it dries; drawn with 'darken' so strokes never bead or lighten each other
+const PAPER = [242, 235, 221];
+function shade(c, wet) {
+  const k = .25 + .75 * Math.min(1, wet * 1.3);
+  const [r, g, b] = c.split(',').map(Number);
+  return `rgb(${PAPER[0] + (r - PAPER[0]) * k | 0},${PAPER[1] + (g - PAPER[1]) * k | 0},${PAPER[2] + (b - PAPER[2]) * k | 0})`;
+}
+ctx.globalCompositeOperation = 'darken';
+
+function spawn(x, y, vx, vy, r, wet, c = color) {
+  if (P.length >= MAX) P.shift();
+  P.push({ x, y, vx, vy, r, wet, c, age: 0 });
+}
+
+function drop(x, y) {
+  const R = (14 + Math.random() * 12) * DPR;
+  // wet pool
+  const g = ctx.createRadialGradient(x, y, 0, x, y, R * 1.6);
+  g.addColorStop(0, `rgba(${color},.85)`); g.addColorStop(.55, `rgba(${color},.55)`);
+  g.addColorStop(.85, `rgba(${color},.12)`); g.addColorStop(1, `rgba(${color},0)`);
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, R * 1.6, 0, 7); ctx.fill();
+  for (let i = 0; i < 18; i++) {
+    const a = Math.random() * 6.283, s = Math.random() * R * .6;
+    spawn(x + Math.cos(a) * s, y + Math.sin(a) * s, Math.cos(a) * .25, Math.sin(a) * .25,
+      R * (.12 + Math.random() * .3), 1);
+  }
+}
+
+// gravity from tilt
+let gx = 0, gy = 0, tiltOn = false;
+function onTilt(e) {
+  if (e.beta == null) return;
+  tiltOn = true;
+  const b = Math.max(-60, Math.min(60, e.beta)) * Math.PI / 180;   // front/back
+  const gm = Math.max(-60, Math.min(60, e.gamma)) * Math.PI / 180; // left/right
+  gx = Math.sin(gm); gy = Math.sin(b) - Math.sin(25 * Math.PI / 180); // ~25° hand-held tilt = neutral
+}
+
+// blow from mic
+let level = 0, floor = 0.01, analyser = null, buf = null;
+function readMic() {
+  if (!analyser) return 0;
+  analyser.getFloatTimeDomainData(buf);
+  let s = 0; for (let i = 0; i < buf.length; i++) s += buf[i] * buf[i];
+  const rms = Math.sqrt(s / buf.length);
+  floor = rms < floor ? floor * .9 + rms * .1 : floor * .998 + rms * .002;   // adaptive noise floor
+  const v = Math.max(0, (rms - floor * 2.2 - 0.004) * 9);
+  level = level * .6 + Math.min(1, v) * .4;
+  return level;
+}
+
+function step() {
+  const blow = readMic();
+  document.getElementById('lvl').style.width = (blow * 100) + '%';
+  const sx = W / 2, sy = H * 1.15;   // mic is at the bottom of the phone
+  const G = .055 * DPR;
+
+  for (let i = P.length - 1; i >= 0; i--) {
+    const p = P[i];
+    p.age++;
+    if (p.wet > 0) {                     // wet ink responds to gravity
+      p.vx += gx * G * p.wet; p.vy += gy * G * p.wet;
+    }
+    if (blow > .05) {                    // blowing pushes ink away from the mic
+      let dx = p.x - sx, dy = p.y - sy; const d = Math.hypot(dx, dy) || 1;
+      dx /= d; dy /= d;
+      const turb = (Math.random() - .5) * 1.4;
+      const f = blow * 1.6 * DPR * (0.5 + 0.5 * p.wet + .3);
+      p.vx += (dx + dy * turb) * f; p.vy += (dy - dx * turb) * f;
+      p.wet = Math.min(1, p.wet + .02);
+      // 吹墨 branching: fast-moving drops split
+      if (p.r > 2.2 * DPR && Math.random() < blow * .08) {
+        spawn(p.x, p.y, p.vx * .8 + (Math.random() - .5) * 2, p.vy * .8 + (Math.random() - .5) * 2, p.r * .6, p.wet, p.c);
+        p.r *= .82;
+      }
+    }
+    p.vx *= .93; p.vy *= .93;
+    const sp = Math.hypot(p.vx, p.vy);
+    if (sp > .08) {
+      const nx = p.x + p.vx, ny = p.y + p.vy;
+      ctx.strokeStyle = shade(p.c, p.wet);
+      ctx.lineWidth = p.r; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(nx, ny); ctx.stroke();
+      p.x = nx; p.y = ny;
+      p.r *= .992 - Math.min(.02, sp * .0015);   // drops thin out as they travel
+    }
+    p.wet *= blow > .05 ? .985 : .996;                                 // ink slowly dries
+    if (p.r < .5 * DPR || p.x < -50 || p.x > W + 50 || p.y < -50 || p.y > H + 50 || p.wet < .03) P.splice(i, 1);
+  }
+  requestAnimationFrame(step);
+}
+
+// ---------- input ----------
+let lastDrop = 0;
+inkC.addEventListener('pointerdown', e => { drop(e.clientX * DPR, e.clientY * DPR); lastDrop = performance.now(); });
+inkC.addEventListener('pointermove', e => {
+  if (e.buttons && performance.now() - lastDrop > 140) { drop(e.clientX * DPR, e.clientY * DPR); lastDrop = performance.now(); }
+});
+
+document.querySelectorAll('.sw').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.sw').forEach(x => x.classList.remove('on'));
+  b.classList.add('on'); color = b.dataset.c;
+});
+document.getElementById('clear').onclick = () => { ctx.clearRect(0, 0, W, H); P.length = 0; };
+document.getElementById('save').onclick = () => {
+  const out = document.createElement('canvas'); out.width = W; out.height = H;
+  const o = out.getContext('2d');
+  o.drawImage(paperC, 0, 0); o.globalCompositeOperation = 'multiply'; o.drawImage(inkC, 0, 0);
+  document.getElementById('shotImg').src = out.toDataURL('image/jpeg', .92);
+  document.getElementById('shot').style.display = 'flex';
+};
+document.getElementById('shotClose').onclick = () => document.getElementById('shot').style.display = 'none';
+
+// ---------- start (permissions need a user tap) ----------
+document.getElementById('go').onclick = async () => {
+  document.getElementById('intro').style.display = 'none';
+  const notes = [];
+  try {
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      const r = await DeviceOrientationEvent.requestPermission();
+      if (r !== 'granted') notes.push('未開啟傾斜');
+    }
+    addEventListener('deviceorientation', onTilt);
+  } catch (e) { notes.push('未開啟傾斜'); }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    if (ac.state === 'suspended') await ac.resume();
+    const src = ac.createMediaStreamSource(stream);
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700;  // breath is mostly low-frequency noise
+    analyser = ac.createAnalyser(); analyser.fftSize = 1024;
+    buf = new Float32Array(analyser.fftSize);
+    src.connect(lp); lp.connect(analyser);
+  } catch (e) { notes.push('未開啟麥克風，仍可點擊與傾斜'); }
+  toast(notes.length ? notes.join('・') : '點一下紙面，然後對手機下方吹氣');
+  // a few starter drops
+  for (let i = 0; i < 3; i++) drop(W * (.3 + Math.random() * .4), H * (.3 + Math.random() * .3));
+  setTimeout(() => { if (!tiltOn) gy = 0; }, 1500);
+};
+
+requestAnimationFrame(step);
+})();
+</script>
+</body>
+</html>

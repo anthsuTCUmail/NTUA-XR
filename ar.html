@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>體驗一｜把雕塑放進教室</title>
+<script type="module" src="lib/model-viewer.min.js"></script>
+<style>
+  :root { --paper:#f4efe6; --ink:#1d1b19; --muted:#7a7268; --accent:#a8431f; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { height:100%; background:var(--paper); color:var(--ink);
+    font-family:"Noto Serif TC","Songti TC","PMingLiU",serif; }
+  body { display:flex; flex-direction:column; }
+  header { padding:calc(14px + env(safe-area-inset-top)) 20px 6px; }
+  header small { color:var(--muted); letter-spacing:.2em; font-size:12px; }
+  header h1 { font-size:22px; font-weight:600; margin-top:2px; }
+  model-viewer { flex:1; width:100%; min-height:52vh; background:radial-gradient(ellipse at 50% 60%, #fffaf2 0%, var(--paper) 70%);
+    --poster-color:transparent; }
+  .ar-btn { position:absolute; left:50%; bottom:18px; transform:translateX(-50%);
+    background:var(--ink); color:var(--paper); border:none; border-radius:999px;
+    padding:14px 26px; font:600 16px/1 inherit; font-family:inherit; letter-spacing:.08em;
+    box-shadow:0 6px 18px rgba(0,0,0,.25); }
+  .ar-btn:active { transform:translateX(-50%) scale(.96); }
+  .hint { position:absolute; top:2px; left:0; right:0; text-align:center; font-size:13px; color:var(--muted); }
+  .no-ar { position:absolute; bottom:22px; left:20px; right:20px; text-align:center; font-size:13px; color:var(--muted); display:none; }
+  .info { padding:12px 20px 4px; min-height:84px; }
+  .info h2 { font-size:19px; }
+  .info .meta { color:var(--muted); font-size:13px; margin:2px 0 6px; }
+  .info p { font-size:14px; line-height:1.65; }
+  nav { display:flex; gap:10px; padding:12px 20px calc(16px + env(safe-area-inset-bottom)); overflow-x:auto; }
+  nav button { flex:1; min-width:88px; border:1px solid #cfc6b8; background:transparent; color:var(--ink);
+    border-radius:12px; padding:10px 8px; font-family:inherit; font-size:15px; }
+  nav button.on { background:var(--ink); color:var(--paper); border-color:var(--ink); }
+  .prompt { margin:0 20px 6px; padding:10px 12px; border-left:3px solid var(--accent); font-size:13px; line-height:1.6; color:#4a443d; background:rgba(168,67,31,.06); }
+  .back { position:fixed; top:calc(14px + env(safe-area-inset-top)); right:18px; color:var(--muted); font-size:13px; text-decoration:none; }
+</style>
+</head>
+<body>
+<a class="back" href="index.html">← 目錄</a>
+<header>
+  <small>體驗一 · XR</small>
+  <h1>把雕塑放進教室</h1>
+</header>
+
+<model-viewer id="mv" src="models/twist.glb" alt="3D 雕塑"
+  ar ar-modes="webxr scene-viewer quick-look" ar-scale="auto" ar-placement="floor"
+  camera-controls touch-action="pan-y" auto-rotate auto-rotate-delay="1500" rotation-per-second="18deg"
+  shadow-intensity="1" shadow-softness="0.8" exposure="1.05" environment-image="neutral"
+  camera-orbit="30deg 75deg 115%" interaction-prompt="auto">
+  <div class="hint">單指旋轉・雙指縮放</div>
+  <button slot="ar-button" class="ar-btn">⬚ 放到我眼前的空間</button>
+  <div class="no-ar" id="noAr">這支手機的瀏覽器不支援 AR，仍可在上方旋轉觀看。</div>
+</model-viewer>
+
+<section class="info">
+  <h2 id="title"></h2>
+  <div class="meta" id="meta"></div>
+  <p id="desc"></p>
+</section>
+
+<div class="prompt">進入 AR 後：把作品放在桌上或地上，走到它旁邊、蹲下來看、繞一圈。<br>想一想：<b>作品離開了展場，「在場」還成立嗎？</b></div>
+
+<nav id="nav"></nav>
+
+<script>
+// ▼ 在這裡替換成你自己的作品（例如用 Polycam 掃描後匯出的 .glb）
+const WORKS = [
+  { src:"models/twist.glb", name:"扭轉", title:"扭轉 Twist",
+    meta:"青銅（數位）・高 42 cm",
+    desc:"一根柱子在上升時慢慢轉身。五瓣的截面在旋轉中不斷改變輪廓，從不同角度看，是不同的作品。" },
+  { src:"models/stone.glb", name:"石之息", title:"石之息 Breathing Stone",
+    meta:"大理石（數位）・高 46 cm",
+    desc:"像被水流與時間磨過的石頭。試著把它放在窗邊的光裡，或放在你的腳邊，感受尺度改變了什麼。" },
+  { src:"models/ring.glb", name:"環", title:"環 Möbius",
+    meta:"黑漆（數位）・高 50 cm",
+    desc:"沒有內外之分的環。順著表面走一圈，你會發現自己回到了起點的背面。" },
+];
+
+const mv = document.getElementById('mv'), nav = document.getElementById('nav');
+function show(i) {
+  const w = WORKS[i];
+  mv.src = w.src;
+  document.getElementById('title').textContent = w.title;
+  document.getElementById('meta').textContent = w.meta;
+  document.getElementById('desc').textContent = w.desc;
+  [...nav.children].forEach((b, k) => b.classList.toggle('on', k === i));
+}
+WORKS.forEach((w, i) => {
+  const b = document.createElement('button');
+  b.textContent = w.name; b.onclick = () => show(i);
+  nav.appendChild(b);
+});
+show(0);
+
+mv.addEventListener('load', () => {
+  if (!mv.canActivateAR) document.getElementById('noAr').style.display = 'block';
+});
+</script>
+</body>
+</html>
