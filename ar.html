@@ -8,26 +8,27 @@
 <style>
   :root { --paper:#f4efe6; --ink:#1d1b19; --muted:#7a7268; --accent:#a8431f; }
   * { box-sizing:border-box; margin:0; padding:0; }
-  html, body { height:100%; background:var(--paper); color:var(--ink);
+  html, body { min-height:100%; background:var(--paper); color:var(--ink);
     font-family:"Noto Serif TC","Songti TC","PMingLiU",serif; }
   body { display:flex; flex-direction:column; }
+  header, .info, .prompt, nav { flex-shrink:0; }
   header { padding:calc(14px + env(safe-area-inset-top)) 20px 6px; }
   header small { color:var(--muted); letter-spacing:.2em; font-size:12px; }
   header h1 { font-size:22px; font-weight:600; margin-top:2px; }
-  model-viewer { flex:1; width:100%; min-height:52vh; background:radial-gradient(ellipse at 50% 60%, #fffaf2 0%, var(--paper) 70%);
+  model-viewer { flex-shrink:0; width:100%; height:58vh; height:58svh; background:radial-gradient(ellipse at 50% 60%, #fffaf2 0%, var(--paper) 70%);
     --poster-color:transparent; }
   .ar-btn { position:absolute; left:50%; bottom:18px; transform:translateX(-50%);
     background:var(--ink); color:var(--paper); border:none; border-radius:999px;
     padding:14px 26px; font:600 16px/1 inherit; font-family:inherit; letter-spacing:.08em;
     box-shadow:0 6px 18px rgba(0,0,0,.25); }
   .ar-btn:active { transform:translateX(-50%) scale(.96); }
-  .hint { position:absolute; top:2px; left:0; right:0; text-align:center; font-size:13px; color:var(--muted); }
+  .hint { position:absolute; top:2px; pointer-events:none; left:0; right:0; text-align:center; font-size:13px; color:var(--muted); }
   .no-ar { position:absolute; bottom:22px; left:20px; right:20px; text-align:center; font-size:13px; color:var(--muted); display:none; }
-  .info { padding:12px 20px 4px; min-height:84px; }
+  .info { padding:12px 20px 8px; }
   .info h2 { font-size:19px; }
   .info .meta { color:var(--muted); font-size:13px; margin:2px 0 6px; }
   .info p { font-size:14px; line-height:1.65; }
-  nav { display:flex; gap:10px; padding:12px 20px calc(16px + env(safe-area-inset-bottom)); overflow-x:auto; }
+  nav { display:flex; gap:10px; padding:12px 20px calc(90px + env(safe-area-inset-bottom)); overflow-x:auto; }
   nav button { flex:1; min-width:88px; border:1px solid #cfc6b8; background:transparent; color:var(--ink);
     border-radius:12px; padding:10px 8px; font-family:inherit; font-size:15px; }
   nav button.on { background:var(--ink); color:var(--paper); border-color:var(--ink); }
